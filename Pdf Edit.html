@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E-Commerce & PDF Tools Hub</title>
+  
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    /* Global Styles */
+    body {
+      margin: 0;
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%);
+      padding: 40px 20px;
+      box-sizing: border-box;
+    }
+
+    /* Grid Layout Container */
+    .tools-wrapper {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 30px;
+      max-width: 1400px;
+      width: 100%;
+    }
+
+    /* Shared Card Styles (Glassmorphism) */
+    .tool-card {
+      backdrop-filter: blur(15px);
+      border-radius: 20px;
+      padding: 40px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.3);
+      display: flex;
+      flex-direction: column;
+      color: #fff;
+    }
+
+    /* Colors */
+    .amazon-card { background: rgba(255, 153, 0, 0.25); } /* Amazon Orange */
+    .ekart-card { background: rgba(255, 87, 34, 0.25); }  /* E-Kart Red-Orange */
+    .generic-card { background: rgba(40, 167, 69, 0.25); } /* Meesho/Fixed Green */
+    .flipkart-card { background: rgba(40, 116, 240, 0.25); } /* Flipkart Blue */
+    .pdf-card { background: rgba(255, 255, 255, 0.15); } /* PDF Tools Clear/White */
+
+    .tool-card h1 {
+      margin-top: 0; margin-bottom: 10px; font-size: 22px;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+    }
+    .tool-card p {
+      font-size: 13px; margin-top: 0; margin-bottom: 25px; opacity: 0.9;
+    }
+
+    /* Inputs & Buttons */
+    .tool-input {
+      width: 100%; padding: 12px; margin-bottom: 20px;
+      border: 1px solid rgba(255,255,255,0.5); border-radius: 10px;
+      background: rgba(255,255,255,0.1); color: #fff;
+      box-sizing: border-box; font-family: inherit; cursor: pointer;
+    }
+    .tool-input::file-selector-button {
+      background: rgba(255,255,255,0.2); border: none; color: white;
+      padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-right: 10px;
+    }
+    .tool-input::placeholder { color: rgba(255,255,255,0.7); }
+
+    .button-group { display: flex; gap: 10px; margin-top: auto; width: 100%; }
+
+    .tool-btn {
+      background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.4);
+      padding: 12px 10px; border-radius: 10px; color: #fff;
+      font-size: 14px; font-weight: bold; cursor: pointer; transition: 0.3s; flex: 1; 
+    }
+    .tool-btn:hover { background: rgba(255,255,255,0.4); }
+    .tool-btn:disabled { background: rgba(255,255,255,0.1); cursor: not-allowed; color: rgba(255,255,255,0.5); }
+
+    .clear-btn {
+      background: rgba(255, 99, 71, 0.25); border: 1px solid rgba(255, 99, 71, 0.4); flex: 0.5;
+    }
+    .clear-btn:hover { background: rgba(255, 99, 71, 0.5); }
+
+    .status { margin-top: 15px; font-size: 14px; font-weight: bold; min-height: 20px; }
+    .success { color: #a5d6a7; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+    .error { color: #ef9a9a; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+
+    ul#fileList { list-style: none; padding: 0; margin: 0 0 20px 0; text-align: left; }
+    ul#fileList li {
+      background: rgba(255,255,255,0.1); margin: 5px 0; padding: 8px 10px;
+      border-radius: 8px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="tools-wrapper">
+    
+    <div class="tool-card amazon-card">
+      <h1>Amazon to Excel</h1>
+      <p>Extract full data (Multi-line description)</p>
+      <input type="file" id="amazonPdfInput" class="tool-input" accept="application/pdf" multiple>
+      <div class="button-group">
+        <button id="amazonExtractBtn" class="tool-btn">Export</button>
+        <button id="clearAmazonBtn" class="tool-btn clear-btn">Clear</button>
+      </div>
+      <div id="amazonStatus" class="status"></div>
+    </div>
+
+    <div class="tool-card ekart-card">
+      <h1>E-Kart to Excel</h1>
+      <p>Extracts Order No, AWB, Name, SKU & Qty</p>
+      <input type="file" id="ekartPdfInput" class="tool-input" accept="application/pdf" multiple>
+      <div class="button-group">
+        <button id="ekartExtractBtn" class="tool-btn">Export</button>
+        <button id="clearEkartBtn" class="tool-btn clear-btn">Clear</button>
+      </div>
+      <div id="ekartStatus" class="status"></div>
+    </div>
+
+    <div class="tool-card generic-card">
+      <h1>Meesho / Fixed to Excel</h1>
+      <p>Extracts Name, Delivery Partner, SKU, Desc, Qty, Total</p>
+      <input type="file" id="genericPdfInput" class="tool-input" accept="application/pdf" multiple>
+      <div class="button-group">
+        <button id="genericExtractBtn" class="tool-btn">Export</button>
+        <button id="clearGenericBtn" class="tool-btn clear-btn">Clear</button>
+      </div>
+      <div id="genericStatus" class="status"></div>
+    </div>
+
+    <div class="tool-card flipkart-card">
+      <h1>Crop Flipkart Labels</h1>
+      <p>Extract exact 4x6 inch label dimensions</p>
+      <input type="file" id="cropPdfInput" class="tool-input" accept="application/pdf" multiple>
+      <div class="button-group">
+        <button id="cropBtn" class="tool-btn">Crop Label</button>
+        <button id="clearCropBtn" class="tool-btn clear-btn">Clear</button>
+      </div>
+      <div id="cropStatus" class="status"></div>
+    </div>
+
+    <div class="tool-card pdf-card">
+      <h1>Merge PDFs</h1>
+      <p>Combine multiple PDFs into one</p>
+      <input type="file" id="pdfFiles" class="tool-input" multiple accept="application/pdf">
+      <ul id="fileList"></ul>
+      <div class="button-group">
+        <button id="mergeBtn" class="tool-btn">Merge</button>
+        <button id="clearMergeBtn" class="tool-btn clear-btn">Clear</button>
+      </div>
+      <div id="mergeStatus" class="status"></div>
+    </div>
+
+    <div class="tool-card pdf-card">
+      <h1>Rearrange Pages</h1>
+      <p>Reorder (e.g: 1,4,3,6)</p>
+      <input type="file" id="rearrangePdfInput" class="tool-input" accept="application/pdf">
+      <input type="text" id="pageOrder" class="tool-input" placeholder="Example: 1,4,3,6">
+      <div class="button-group">
+        <button id="rearrangeBtn" class="tool-btn">Rearrange</button>
+        <button id="clearRearrangeBtn" class="tool-btn clear-btn">Clear</button>
+      </div>
+      <div id="rearrangeStatus" class="status"></div>
+    </div>
+
+    <div class="tool-card pdf-card">
+      <h1>Odd / Even Split</h1>
+      <p>Separate labels (odd) from bills (even)</p>
+      <input type="file" id="splitPdfInput" class="tool-input" accept="application/pdf">
+      <div class="button-group">
+        <button id="oddBtn" class="tool-btn">Odd</button>
+        <button id="evenBtn" class="tool-btn">Even</button>
+        <button id="clearSplitBtn" class="tool-btn clear-btn">Clear</button>
+      </div>
+      <div id="splitStatus" class="status"></div>
+    </div>
+
+    <div class="tool-card pdf-card">
+      <h1>Remove Pages</h1>
+      <p>Delete specific pages (e.g: 2, 5)</p>
+      <input type="file" id="removePdfInput" class="tool-input" accept="application/pdf">
+      <input type="text" id="pagesToRemove" class="tool-input" placeholder="Example: 2, 5, 8">
+      <div class="button-group">
+        <button id="removeBtn" class="tool-btn">Remove</button>
+        <button id="clearRemoveBtn" class="tool-btn clear-btn">Clear</button>
+      </div>
+      <div id="removeStatus" class="status"></div>
+    </div>
+
+  </div>
+
+  <script>
+    // Global Config
+    const { PDFDocument } = PDFLib;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    function triggerDownload(pdfBytes, filename) {
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url; link.download = filename;
+      document.body.appendChild(link); link.click();
+      document.body.removeChild(link); URL.revokeObjectURL(url);
+    }
+
+    /* ==========================================
+       1. AMAZON INVOICE EXTRACTOR 
+       ========================================== */
+    const amazonExtractBtn = document.getElementById('amazonExtractBtn');
+    amazonExtractBtn.addEventListener('click', async () => {
+      const files = document.getElementById('amazonPdfInput').files;
+      const status = document.getElementById('amazonStatus');
+      if (!files.length) { status.textContent = 'Upload PDF first.'; status.className = 'status error'; return; }
+      
+      amazonExtractBtn.disabled = true; amazonExtractBtn.textContent = 'Extracting...'; status.textContent = '';
+      let excelData = [];
+
+      try {
+        for (let file of files) {
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            const textItems = textContent.items.map(item => item.str.trim()).filter(s => s.length > 0);
+            const fullText = textItems.join(' '); 
+
+            const orderMatch = fullText.match(/Order Number\s*[:\s]+([0-9-]+)/i);
+            const invMatch = fullText.match(/Invoice Number\s*[:\s]+([A-Z0-9-]+)/i);
+            const priceRegex = /^(?:₹|Rs\.?)?\s*([0-9,]+\.[0-9]{2})$/i;
+            
+            let name = "Not Found", total = "0.00", products = [], currentItemNumber = 1; 
+
+            for (let i = 0; i < textItems.length; i++) {
+              if (textItems[i].includes("Shipping Address")) {
+                if (textItems[i+1] && textItems[i+1] !== ":" && textItems[i+1].length > 2) name = textItems[i+1];
+                else if (textItems[i+2]) name = textItems[i+2]; 
+              }
+
+              if (textItems[i] === "TOTAL:" || textItems[i] === "TOTAL") {
+                 let possibleTotals = [];
+                 for (let j = 1; j <= 15; j++) {
+                    if (textItems[i+j]) {
+                       let match = textItems[i+j].match(priceRegex);
+                       if (match) possibleTotals.push(match[1].replace(/,/g, ''));
+                    }
+                 }
+                 if (possibleTotals.length > 0) total = possibleTotals[possibleTotals.length - 1];
+              }
+
+              if (textItems[i] === currentItemNumber.toString()) {
+                  if (textItems[i+1] && textItems[i+1].length > 5 && !priceRegex.test(textItems[i+1])) {
+                      let descriptionParts = [], k = i + 1, qty = "1";
+                      while (k < textItems.length && k < i + 20) { 
+                          if (priceRegex.test(textItems[k])) break;
+                          descriptionParts.push(textItems[k]); k++;
+                      }
+                      let fullDescription = descriptionParts.join(" ");
+
+                      for(let q = k; q <= k + 6 && q < textItems.length; q++) {
+                          if (/^\d+$/.test(textItems[q]) && textItems[q].length < 4) { qty = textItems[q]; break; }
+                      }
+                      products.push({ description: fullDescription, qty: qty });
+                      currentItemNumber++;
+                  }
+              }
+            }
+
+            if (orderMatch || invMatch) {
+              if (products.length > 0) {
+                 products.forEach(p => {
+                    excelData.push({ "File Name": file.name, "Page No": pageNum, "Shipping Name": name, "Order Number": orderMatch ? orderMatch[1] : "Not Found", "Invoice Number": invMatch ? invMatch[1] : "Not Found", "Item Description": p.description, "Qty": p.qty, "Total Amount (₹)": total });
+                 });
+              } else {
+                 excelData.push({ "File Name": file.name, "Page No": pageNum, "Shipping Name": name, "Order Number": orderMatch ? orderMatch[1] : "Not Found", "Invoice Number": invMatch ? invMatch[1] : "Not Found", "Item Description": "Not Found", "Qty": "1", "Total Amount (₹)": total });
+              }
+            }
+          }
+        }
+        if (excelData.length === 0) { status.textContent = 'No data found.'; status.className = 'status error'; return; }
+
+        const ws = XLSX.utils.json_to_sheet(excelData); const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Amazon_Invoices"); XLSX.writeFile(wb, "Amazon_Data.xlsx");
+        status.textContent = `✅ ${excelData.length} Rows Extracted!`; status.className = 'status success';
+      } catch (error) { console.error(error); status.textContent = 'Error extracting data.'; status.className = 'status error';
+      } finally { amazonExtractBtn.disabled = false; amazonExtractBtn.textContent = 'Export'; }
+    });
+    document.getElementById('clearAmazonBtn').addEventListener('click', () => { document.getElementById('amazonPdfInput').value = ''; document.getElementById('amazonStatus').textContent = ''; });
+
+    /* ==========================================
+       2. E-KART LABELS EXTRACTOR
+       ========================================== */
+    const ekartExtractBtn = document.getElementById("ekartExtractBtn");
+    ekartExtractBtn.addEventListener("click", async () => {
+        const files = document.getElementById("ekartPdfInput").files;
+        const status = document.getElementById("ekartStatus");
+        if (!files.length) { status.innerText = "Upload PDF first."; status.className = 'status error'; return; }
+
+        ekartExtractBtn.disabled = true; ekartExtractBtn.innerText = "Processing..."; status.innerText = "";
+        try {
+            let extractedData = [];
+            for(let file of files) {
+                const arrayBuffer = await file.arrayBuffer(); const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i); const textContent = await page.getTextContent();
+                    const textItems = textContent.items.map(item => item.str.trim()).filter(str => str !== "");
+                    const pageText = textItems.join(" ");
+
+                    let orderID = "Not Found", awbNo = "Not Found", customerName = "Not Found", skuDetails = "Not Found", quantity = "Not Found";
+                    const odMatch = pageText.match(/(OD\d{15,})/); if (odMatch) orderID = odMatch[1];
+                    const awbMatch = pageText.match(/AWB No\.?\s*([A-Z0-9]+)/i) || pageText.match(/(FMP[A-Z]\d+)/i); if (awbMatch) awbNo = awbMatch[1];
+                    const nameMatch = pageText.match(/Name:\s*([^,]+)/i); if (nameMatch) customerName = nameMatch[1].trim();
+
+                    let skuStartIndex = textItems.findIndex(item => item.includes("SKU ID | Description"));
+                    if (skuStartIndex !== -1) {
+                        let skuParts = [], foundSerial = false;
+                        for (let j = skuStartIndex + 1; j < textItems.length; j++) {
+                            let item = textItems[j];
+                            if (item.match(/^FMP[A-Z0-9]+/i) || item.includes("STD E") || item.includes("Ordered through") || item.includes("Not for resale") || item.includes("Sold By:")) break;
+                            if (item === "QTY") continue;
+                            if (!foundSerial && item === "1") { foundSerial = true; continue; }
+                            if (/^\d+$/.test(item)) quantity = item; else skuParts.push(item);
+                        }
+                        if (skuParts.length > 0) skuDetails = skuParts.join(" ");
+                    }
+                    if (orderID !== "Not Found" || customerName !== "Not Found") extractedData.push([orderID, awbNo, customerName, skuDetails, quantity === "Not Found" ? "1" : quantity, i]);
+                }
+            }
+            if (extractedData.length === 0) { status.innerText = "No data found."; status.className = 'status error'; return; }
+            const ws_data = [["Order No.", "AWB No.", "Customer Name", "SKU ID | Description", "Qty", "Page No."], ...extractedData];
+            const ws = XLSX.utils.aoa_to_sheet(ws_data); const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "EKart_Orders"); XLSX.writeFile(wb, "EKart_Labels.xlsx");
+            status.innerText = `✅ ${extractedData.length} records generated!`; status.className = 'status success';
+        } catch (error) { status.innerText = "Error parsing E-Kart PDF."; status.className = 'status error';
+        } finally { ekartExtractBtn.disabled = false; ekartExtractBtn.innerText = "Export"; }
+    });
+    document.getElementById('clearEkartBtn').addEventListener('click', () => { document.getElementById('ekartPdfInput').value = ''; document.getElementById('ekartStatus').textContent = ''; });
+
+    /* ==========================================
+       3. MEESHO / FIXED DATA EXTRACTOR (DELIVERY PARTNER INCLUDED)
+       ========================================== */
+    const genericExtractBtn = document.getElementById("genericExtractBtn");
+    genericExtractBtn.addEventListener("click", async () => {
+        const files = document.getElementById("genericPdfInput").files;
+        const status = document.getElementById("genericStatus");
+        if (!files.length) { status.innerText = "Upload PDF first."; status.className = 'status error'; return; }
+
+        genericExtractBtn.disabled = true; genericExtractBtn.innerText = "Processing..."; status.innerText = "";
+        try {
+            let extractedData = [];
+            for(let file of files) {
+                const arrayBuffer = await file.arrayBuffer(); 
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i); 
+                    const textContent = await page.getTextContent();
+                    const textItems = textContent.items.map(item => item.str.trim()); 
+                    const pageText = textItems.join(" ");
+                    
+                    let customerName = "Not Found", productSku = "Not Found", description = "Not Found", quantity = "Not Found", orderNumber = "Not Found", totalAmount = "Not Found", courierPartner = "Not Found";
+
+                    // 1. Courier Partner Extraction
+                    const couriers = ["valmoplus", "valmo", "delhivery", "shadowfax", "ecom express", "xpressbees", "blue dart", "smartr"];
+                    for(let j=0; j < Math.min(textItems.length, 100); j++){
+                        let txt = textItems[j].toLowerCase();
+                        
+                        // Check known list
+                        let matched = couriers.find(c => txt.includes(c));
+                        if(matched) { courierPartner = textItems[j]; break; }
+                        
+                        // Fallback: Check word before "Pickup" or "Surface"
+                        if(txt === "pickup" || txt === "surface") {
+                            if(j > 0 && textItems[j-1].length > 2 && !textItems[j-1].toLowerCase().includes("cash")) {
+                                courierPartner = textItems[j-1]; break;
+                            }
+                        }
+                    }
+
+                    // 2. Name Extraction
+                    for (let j = 0; j < textItems.length; j++) {
+                        if (textItems[j] === "Customer Address" || textItems[j] === "Customer Name") {
+                            let k = j + 1; while (k < textItems.length && textItems[k] === "") k++;
+                            if (k < textItems.length) customerName = textItems[k]; break;
+                        }
+                    }
+                    
+                    // 3. SKU, Qty, Order Number Extraction
+                    const tableRegex = /Order No\.\s+(\S+)\s+(.+?)\s+(\d+)\s+([a-zA-Z]+)\s+(\d{16,}(?:[_\s]\d+)?)/;
+                    const match = pageText.match(tableRegex);
+                    if (match) { productSku = match[1]; quantity = match[3]; orderNumber = match[5].replace(/\s+/g, '_'); } 
+                    else { 
+                        const orderHunt = pageText.match(/(\d{16,}(?:[_\s]\d+)?)/); 
+                        if (orderHunt) orderNumber = orderHunt[1].replace(/\s+/g, '_'); 
+                        
+                        let skuIdx = textItems.indexOf("SKU");
+                        if(skuIdx !== -1) {
+                            let s = skuIdx + 1; while(s < textItems.length && textItems[s] === "") s++;
+                            if(s < textItems.length) productSku = textItems[s];
+                        }
+                        
+                        let qtyIdx = textItems.indexOf("Qty");
+                        if(qtyIdx !== -1) {
+                            for(let q = qtyIdx+1; q < qtyIdx+5; q++){
+                                if(/^\d+$/.test(textItems[q])){ quantity = textItems[q]; break; }
+                            }
+                        }
+                    }
+
+                    // 4. Total Amount
+                    const rsMatches = [...pageText.matchAll(/Rs\.\s*(\d+\.\d{2})/g)];
+                    if (rsMatches.length > 0) totalAmount = rsMatches[rsMatches.length - 1][1];
+
+                    // 5. Description Extraction
+                    let headerTotalIdx = textItems.lastIndexOf("Total"); 
+                    if (headerTotalIdx !== -1) {
+                        let k = headerTotalIdx + 1;
+                        let descParts = [];
+                        while (k < textItems.length) {
+                            let txt = textItems[k].trim();
+                            if (txt === "" || txt === "Tax Invoice" || txt === "Original For Recipient" || txt.includes("BILL TO")) { k++; continue; }
+                            
+                            if (/^\d{4,8}$/.test(txt)) break; // HSN Code hit
+                            if (txt.includes("Other Charges") || txt.includes("Shipping") || /^Rs\./i.test(txt)) break; // End of desc hit
+
+                            descParts.push(txt);
+                            k++;
+                        }
+                        if (descParts.length > 0) description = descParts.join(" ");
+                    }
+
+                    if (customerName !== "Not Found" || orderNumber !== "Not Found") {
+                        extractedData.push([customerName, courierPartner, productSku, description, quantity, orderNumber, totalAmount, i]);
+                    }
+                }
+            }
+            if (extractedData.length === 0) { status.innerText = "No data found."; status.className = 'status error'; return; }
+            
+            // Generate Excel with Delivery Partner Column
+            const ws_data = [["Customer Full Name", "Delivery Partner", "Item SKU", "Item Description", "Qty", "Order Reference No.", "Total Amount (Rs.)", "Page No."], ...extractedData];
+            const ws = XLSX.utils.aoa_to_sheet(ws_data); const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Meesho_Orders"); XLSX.writeFile(wb, "Meesho_Order_Data.xlsx");
+            
+            status.innerText = `✅ ${extractedData.length} records generated!`; status.className = 'status success';
+        } catch (error) { console.error(error); status.innerText = "Something went wrong."; status.className = 'status error';
+        } finally { genericExtractBtn.disabled = false; genericExtractBtn.innerText = "Export"; }
+    });
+    document.getElementById('clearGenericBtn').addEventListener('click', () => { document.getElementById('genericPdfInput').value = ''; document.getElementById('genericStatus').textContent = ''; });
+
+    /* ==========================================
+       4. FLIPKART LABEL CROPPER
+       ========================================== */
+    const cropBtn = document.getElementById('cropBtn');
+    cropBtn.addEventListener('click', async () => {
+      const cropPdfInput = document.getElementById('cropPdfInput');
+      const cropStatus = document.getElementById('cropStatus');
+      if (cropPdfInput.files.length === 0) { cropStatus.textContent = 'Upload PDF first.'; cropStatus.className = 'status error'; return; }
+      
+      try {
+        cropBtn.disabled = true; cropBtn.textContent = 'Processing...'; cropStatus.textContent = '';
+        const newPdfDoc = await PDFDocument.create();
+        const LABEL_WIDTH = 4 * 72; const LABEL_HEIGHT = 6 * 72; 
+
+        for (const file of cropPdfInput.files) {
+          const arrayBuffer = await file.arrayBuffer();
+          const pdfDoc = await PDFDocument.load(arrayBuffer);
+          const pages = pdfDoc.getPages();
+          for (const page of pages) {
+            const { width, height } = page.getSize(); 
+            const newPage = newPdfDoc.addPage([LABEL_WIDTH, LABEL_HEIGHT]);
+            const embeddedPage = await newPdfDoc.embedPage(page);
+            const scaleFactor = 1.15; 
+            const scaledWidth = width * scaleFactor;
+            const scaledHeight = height * scaleFactor;
+            const xCenterOffset = (LABEL_WIDTH - scaledWidth) / 2;
+            const yTopOffset = LABEL_HEIGHT - scaledHeight + 20;
+            newPage.drawPage(embeddedPage, { x: xCenterOffset, y: yTopOffset, xScale: scaleFactor, yScale: scaleFactor });
+          }
+        }
+        triggerDownload(await newPdfDoc.save(), 'Flipkart_4x6_Label.pdf');
+        cropStatus.textContent = '✅ Cropped Successfully!'; cropStatus.className = 'status success';
+      } catch (error) { cropStatus.textContent = 'Error cropping.'; cropStatus.className = 'status error';
+      } finally { cropBtn.disabled = false; cropBtn.textContent = 'Crop Label'; }
+    });
+    document.getElementById('clearCropBtn').addEventListener('click', () => { document.getElementById('cropPdfInput').value = ''; document.getElementById('cropStatus').textContent = ''; });
+
+    /* ==========================================
+       5. PDF MERGER
+       ========================================== */
+    const pdfFilesInput = document.getElementById('pdfFiles');
+    const mergeBtn = document.getElementById('mergeBtn');
+    let selectedMergeFiles = [];
+
+    pdfFilesInput.addEventListener('change', e => {
+      for (let file of e.target.files) { if (file.type === "application/pdf") selectedMergeFiles.push(file); }
+      const fileList = document.getElementById('fileList'); fileList.innerHTML = '';
+      selectedMergeFiles.forEach(f => { const li = document.createElement('li'); li.textContent = f.name; fileList.appendChild(li); });
+    });
+
+    mergeBtn.addEventListener('click', async () => {
+      const status = document.getElementById('mergeStatus');
+      if (selectedMergeFiles.length < 2) { status.textContent = 'Select at least 2 PDFs.'; status.className = 'status error'; return; }
+      mergeBtn.disabled = true; status.textContent = 'Merging...';
+      try {
+        const mergedPdf = await PDFDocument.create();
+        for (let file of selectedMergeFiles) {
+          const pdf = await PDFDocument.load(await file.arrayBuffer());
+          const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+          copiedPages.forEach(page => mergedPdf.addPage(page));
+        }
+        triggerDownload(await mergedPdf.save(), 'merged.pdf');
+        status.textContent = '✅ Merged Successfully!'; status.className = 'status success';
+      } catch (err) { status.textContent = 'Error merging.'; status.className = 'status error'; } 
+      finally { mergeBtn.disabled = false; }
+    });
+    document.getElementById('clearMergeBtn').addEventListener('click', () => { selectedMergeFiles = []; pdfFilesInput.value = ''; document.getElementById('fileList').innerHTML=''; document.getElementById('mergeStatus').textContent=''; });
+
+    /* ==========================================
+       6. REARRANGE PAGES
+       ========================================== */
+    const rearrangeBtn = document.getElementById('rearrangeBtn');
+    let rearrangeBytes = null;
+    document.getElementById('rearrangePdfInput').addEventListener('change', async (e) => { if(e.target.files[0]) rearrangeBytes = await e.target.files[0].arrayBuffer(); });
+
+    rearrangeBtn.addEventListener('click', async () => {
+      const status = document.getElementById('rearrangeStatus'), orderText = document.getElementById('pageOrder').value.replace(/\s+/g, "");
+      if (!rearrangeBytes || !orderText) { status.textContent = "Upload PDF & Enter Order."; status.className = 'status error'; return; }
+      rearrangeBtn.disabled = true; status.textContent = 'Processing...';
+      try {
+        const order = orderText.split(",").map(n => parseInt(n) - 1);
+        const pdfDoc = await PDFDocument.load(rearrangeBytes), newPdf = await PDFDocument.create();
+        (await newPdf.copyPages(pdfDoc, order)).forEach(p => newPdf.addPage(p));
+        triggerDownload(await newPdf.save(), 'rearranged.pdf');
+        status.textContent = "✅ Rearranged!"; status.className = 'status success';
+      } catch (err) { status.textContent = "Error! Check page numbers."; status.className = 'status error'; } 
+      finally { rearrangeBtn.disabled = false; }
+    });
+    document.getElementById('clearRearrangeBtn').addEventListener('click', () => { document.getElementById('rearrangePdfInput').value=''; document.getElementById('pageOrder').value=''; rearrangeBytes=null; document.getElementById('rearrangeStatus').textContent=''; });
+
+    /* ==========================================
+       7. ODD/EVEN SPLITTER
+       ========================================== */
+    let splitBytes = null;
+    document.getElementById('splitPdfInput').addEventListener('change', async (e) => { if(e.target.files[0]) splitBytes = await e.target.files[0].arrayBuffer(); });
+
+    async function splitPages(isOdd) {
+      const status = document.getElementById('splitStatus');
+      if (!splitBytes) { status.textContent = "Upload PDF first."; status.className = 'status error'; return; }
+      document.getElementById('oddBtn').disabled = true; document.getElementById('evenBtn').disabled = true; status.textContent = 'Processing...';
+      try {
+        const pdfDoc = await PDFDocument.load(splitBytes), newPdf = await PDFDocument.create(), indices = [];
+        for (let i = 0; i < pdfDoc.getPageCount(); i++) if ((isOdd && i%2===0) || (!isOdd && i%2!==0)) indices.push(i);
+        (await newPdf.copyPages(pdfDoc, indices)).forEach(p => newPdf.addPage(p));
+        triggerDownload(await newPdf.save(), isOdd ? 'Labels_Odd.pdf' : 'Bills_Even.pdf');
+        status.textContent = `✅ Extracted!`; status.className = 'status success';
+      } catch (err) { status.textContent = "Error splitting."; status.className = 'status error'; } 
+      finally { document.getElementById('oddBtn').disabled = false; document.getElementById('evenBtn').disabled = false; }
+    }
+    document.getElementById('oddBtn').addEventListener('click', () => splitPages(true)); document.getElementById('evenBtn').addEventListener('click', () => splitPages(false));
+    document.getElementById('clearSplitBtn').addEventListener('click', () => { document.getElementById('splitPdfInput').value=''; splitBytes=null; document.getElementById('splitStatus').textContent=''; });
+
+    /* ==========================================
+       8. REMOVE PAGES
+       ========================================== */
+    const removeBtn = document.getElementById('removeBtn');
+    let removeBytes = null;
+    document.getElementById('removePdfInput').addEventListener('change', async (e) => { if(e.target.files[0]) removeBytes = await e.target.files[0].arrayBuffer(); });
+
+    removeBtn.addEventListener('click', async () => {
+      const status = document.getElementById('removeStatus'), orderText = document.getElementById('pagesToRemove').value.replace(/\s+/g, "");
+      if (!removeBytes || !orderText) { status.textContent = "Upload PDF & Enter Pages."; status.className = 'status error'; return; }
+      removeBtn.disabled = true; status.textContent = 'Processing...';
+      try {
+        const pagesToRemove = [...new Set(orderText.split(",").map(n => parseInt(n) - 1).filter(n => !isNaN(n)))].sort((a, b) => b - a); 
+        const pdfDoc = await PDFDocument.load(removeBytes);
+        pagesToRemove.forEach(index => pdfDoc.removePage(index));
+        triggerDownload(await pdfDoc.save(), 'cleaned_document.pdf');
+        status.textContent = "✅ Pages Removed!"; status.className = 'status success';
+      } catch (err) { status.textContent = "Error! Invalid numbers."; status.className = 'status error'; } 
+      finally { removeBtn.disabled = false; }
+    });
+    document.getElementById('clearRemoveBtn').addEventListener('click', () => { document.getElementById('removePdfInput').value=''; document.getElementById('pagesToRemove').value=''; removeBytes=null; document.getElementById('removeStatus').textContent=''; });
+
+  </script>
+</body>
+</html>
