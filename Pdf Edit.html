@@ -46,11 +46,10 @@
     }
 
     /* Colors */
-    .amazon-card { background: rgba(255, 153, 0, 0.25); } /* Amazon Orange */
-    .ekart-card { background: rgba(255, 87, 34, 0.25); }  /* E-Kart Red-Orange */
-    .generic-card { background: rgba(40, 167, 69, 0.25); } /* Meesho/Fixed Green */
     .flipkart-card { background: rgba(40, 116, 240, 0.25); } /* Flipkart Blue */
+    .meesho-card { background: rgba(244, 51, 151, 0.25); } /* Meesho Pink */
     .pdf-card { background: rgba(255, 255, 255, 0.15); } /* PDF Tools Clear/White */
+    .excel-card { background: rgba(40, 167, 69, 0.25); } /* Excel Green */
 
     .tool-card h1 {
       margin-top: 0; margin-bottom: 10px; font-size: 22px;
@@ -102,38 +101,16 @@
 <body>
 
   <div class="tools-wrapper">
-    
-    <div class="tool-card amazon-card">
-      <h1>Amazon to Excel</h1>
-      <p>Extract full data (Multi-line description)</p>
-      <input type="file" id="amazonPdfInput" class="tool-input" accept="application/pdf" multiple>
-      <div class="button-group">
-        <button id="amazonExtractBtn" class="tool-btn">Export</button>
-        <button id="clearAmazonBtn" class="tool-btn clear-btn">Clear</button>
-      </div>
-      <div id="amazonStatus" class="status"></div>
-    </div>
 
-    <div class="tool-card ekart-card">
-      <h1>E-Kart to Excel</h1>
-      <p>Extracts Order No, AWB, Name, SKU & Qty</p>
-      <input type="file" id="ekartPdfInput" class="tool-input" accept="application/pdf" multiple>
+    <div class="tool-card meesho-card">
+      <h1>Crop Meesho Labels</h1>
+      <p>Extract only the top portion (adjusted)</p>
+      <input type="file" id="meeshoCropPdfInput" class="tool-input" accept="application/pdf" multiple>
       <div class="button-group">
-        <button id="ekartExtractBtn" class="tool-btn">Export</button>
-        <button id="clearEkartBtn" class="tool-btn clear-btn">Clear</button>
+        <button id="meeshoCropBtn" class="tool-btn">Crop Label</button>
+        <button id="clearMeeshoCropBtn" class="tool-btn clear-btn">Clear</button>
       </div>
-      <div id="ekartStatus" class="status"></div>
-    </div>
-
-    <div class="tool-card generic-card">
-      <h1>Meesho / Fixed to Excel</h1>
-      <p>Extracts Name, Delivery Partner, SKU, Desc, Qty, Total</p>
-      <input type="file" id="genericPdfInput" class="tool-input" accept="application/pdf" multiple>
-      <div class="button-group">
-        <button id="genericExtractBtn" class="tool-btn">Export</button>
-        <button id="clearGenericBtn" class="tool-btn clear-btn">Clear</button>
-      </div>
-      <div id="genericStatus" class="status"></div>
+      <div id="meeshoCropStatus" class="status"></div>
     </div>
 
     <div class="tool-card flipkart-card">
@@ -195,6 +172,17 @@
       <div id="removeStatus" class="status"></div>
     </div>
 
+    <div class="tool-card excel-card">
+      <h1>Merge Excel Files</h1>
+      <p>Combine multiple Excel files with same headings</p>
+      <input type="file" id="excelMergeInput" class="tool-input" accept=".xlsx, .xls, .csv" multiple>
+      <div class="button-group">
+        <button id="excelMergeBtn" class="tool-btn">Merge & Download</button>
+        <button id="clearExcelMergeBtn" class="tool-btn clear-btn">Clear</button>
+      </div>
+      <div id="excelMergeStatus" class="status"></div>
+    </div>
+
   </div>
 
   <script>
@@ -202,8 +190,9 @@
     const { PDFDocument } = PDFLib;
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    function triggerDownload(pdfBytes, filename) {
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    function triggerDownload(fileBytes, filename, isExcel = false) {
+      let type = isExcel ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/pdf';
+      const blob = new Blob([fileBytes], { type: type });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url; link.download = filename;
@@ -212,252 +201,45 @@
     }
 
     /* ==========================================
-       1. AMAZON INVOICE EXTRACTOR 
+       1. MEESHO LABEL CROPPER
        ========================================== */
-    const amazonExtractBtn = document.getElementById('amazonExtractBtn');
-    amazonExtractBtn.addEventListener('click', async () => {
-      const files = document.getElementById('amazonPdfInput').files;
-      const status = document.getElementById('amazonStatus');
-      if (!files.length) { status.textContent = 'Upload PDF first.'; status.className = 'status error'; return; }
+    const meeshoCropBtn = document.getElementById('meeshoCropBtn');
+    meeshoCropBtn.addEventListener('click', async () => {
+      const cropPdfInput = document.getElementById('meeshoCropPdfInput');
+      const cropStatus = document.getElementById('meeshoCropStatus');
+      if (cropPdfInput.files.length === 0) { cropStatus.textContent = 'Upload PDF first.'; cropStatus.className = 'status error'; return; }
       
-      amazonExtractBtn.disabled = true; amazonExtractBtn.textContent = 'Extracting...'; status.textContent = '';
-      let excelData = [];
-
       try {
-        for (let file of files) {
+        meeshoCropBtn.disabled = true; meeshoCropBtn.textContent = 'Processing...'; cropStatus.textContent = '';
+        const newPdfDoc = await PDFDocument.create();
+
+        for (const file of cropPdfInput.files) {
           const arrayBuffer = await file.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          const pdfDoc = await PDFDocument.load(arrayBuffer);
+          const pages = pdfDoc.getPages();
           
-          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-            const page = await pdf.getPage(pageNum);
-            const textContent = await page.getTextContent();
-            const textItems = textContent.items.map(item => item.str.trim()).filter(s => s.length > 0);
-            const fullText = textItems.join(' '); 
-
-            const orderMatch = fullText.match(/Order Number\s*[:\s]+([0-9-]+)/i);
-            const invMatch = fullText.match(/Invoice Number\s*[:\s]+([A-Z0-9-]+)/i);
-            const priceRegex = /^(?:₹|Rs\.?)?\s*([0-9,]+\.[0-9]{2})$/i;
+          for (const page of pages) {
+            const { width, height } = page.getSize(); 
+            // 50% se 50px aur upar crop kiya gaya hai
+            const cropHeight = (height * 0.50) - 50; 
+            const newPage = newPdfDoc.addPage([width, cropHeight]);
+            const embeddedPage = await newPdfDoc.embedPage(page);
             
-            let name = "Not Found", total = "0.00", products = [], currentItemNumber = 1; 
-
-            for (let i = 0; i < textItems.length; i++) {
-              if (textItems[i].includes("Shipping Address")) {
-                if (textItems[i+1] && textItems[i+1] !== ":" && textItems[i+1].length > 2) name = textItems[i+1];
-                else if (textItems[i+2]) name = textItems[i+2]; 
-              }
-
-              if (textItems[i] === "TOTAL:" || textItems[i] === "TOTAL") {
-                 let possibleTotals = [];
-                 for (let j = 1; j <= 15; j++) {
-                    if (textItems[i+j]) {
-                       let match = textItems[i+j].match(priceRegex);
-                       if (match) possibleTotals.push(match[1].replace(/,/g, ''));
-                    }
-                 }
-                 if (possibleTotals.length > 0) total = possibleTotals[possibleTotals.length - 1];
-              }
-
-              if (textItems[i] === currentItemNumber.toString()) {
-                  if (textItems[i+1] && textItems[i+1].length > 5 && !priceRegex.test(textItems[i+1])) {
-                      let descriptionParts = [], k = i + 1, qty = "1";
-                      while (k < textItems.length && k < i + 20) { 
-                          if (priceRegex.test(textItems[k])) break;
-                          descriptionParts.push(textItems[k]); k++;
-                      }
-                      let fullDescription = descriptionParts.join(" ");
-
-                      for(let q = k; q <= k + 6 && q < textItems.length; q++) {
-                          if (/^\d+$/.test(textItems[q]) && textItems[q].length < 4) { qty = textItems[q]; break; }
-                      }
-                      products.push({ description: fullDescription, qty: qty });
-                      currentItemNumber++;
-                  }
-              }
-            }
-
-            if (orderMatch || invMatch) {
-              if (products.length > 0) {
-                 products.forEach(p => {
-                    excelData.push({ "File Name": file.name, "Page No": pageNum, "Shipping Name": name, "Order Number": orderMatch ? orderMatch[1] : "Not Found", "Invoice Number": invMatch ? invMatch[1] : "Not Found", "Item Description": p.description, "Qty": p.qty, "Total Amount (₹)": total });
-                 });
-              } else {
-                 excelData.push({ "File Name": file.name, "Page No": pageNum, "Shipping Name": name, "Order Number": orderMatch ? orderMatch[1] : "Not Found", "Invoice Number": invMatch ? invMatch[1] : "Not Found", "Item Description": "Not Found", "Qty": "1", "Total Amount (₹)": total });
-              }
-            }
+            // Draw page shifted down to keep only the top visible
+            newPage.drawPage(embeddedPage, { x: 0, y: cropHeight - height });
           }
         }
-        if (excelData.length === 0) { status.textContent = 'No data found.'; status.className = 'status error'; return; }
-
-        const ws = XLSX.utils.json_to_sheet(excelData); const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Amazon_Invoices"); XLSX.writeFile(wb, "Amazon_Data.xlsx");
-        status.textContent = `✅ ${excelData.length} Rows Extracted!`; status.className = 'status success';
-      } catch (error) { console.error(error); status.textContent = 'Error extracting data.'; status.className = 'status error';
-      } finally { amazonExtractBtn.disabled = false; amazonExtractBtn.textContent = 'Export'; }
+        triggerDownload(await newPdfDoc.save(), 'Meesho_Cropped_Labels.pdf');
+        cropStatus.textContent = '✅ Cropped Successfully!'; cropStatus.className = 'status success';
+      } catch (error) { 
+        console.error(error);
+        cropStatus.textContent = 'Error cropping.'; cropStatus.className = 'status error';
+      } finally { meeshoCropBtn.disabled = false; meeshoCropBtn.textContent = 'Crop Label'; }
     });
-    document.getElementById('clearAmazonBtn').addEventListener('click', () => { document.getElementById('amazonPdfInput').value = ''; document.getElementById('amazonStatus').textContent = ''; });
+    document.getElementById('clearMeeshoCropBtn').addEventListener('click', () => { document.getElementById('meeshoCropPdfInput').value = ''; document.getElementById('meeshoCropStatus').textContent = ''; });
 
     /* ==========================================
-       2. E-KART LABELS EXTRACTOR
-       ========================================== */
-    const ekartExtractBtn = document.getElementById("ekartExtractBtn");
-    ekartExtractBtn.addEventListener("click", async () => {
-        const files = document.getElementById("ekartPdfInput").files;
-        const status = document.getElementById("ekartStatus");
-        if (!files.length) { status.innerText = "Upload PDF first."; status.className = 'status error'; return; }
-
-        ekartExtractBtn.disabled = true; ekartExtractBtn.innerText = "Processing..."; status.innerText = "";
-        try {
-            let extractedData = [];
-            for(let file of files) {
-                const arrayBuffer = await file.arrayBuffer(); const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i); const textContent = await page.getTextContent();
-                    const textItems = textContent.items.map(item => item.str.trim()).filter(str => str !== "");
-                    const pageText = textItems.join(" ");
-
-                    let orderID = "Not Found", awbNo = "Not Found", customerName = "Not Found", skuDetails = "Not Found", quantity = "Not Found";
-                    const odMatch = pageText.match(/(OD\d{15,})/); if (odMatch) orderID = odMatch[1];
-                    const awbMatch = pageText.match(/AWB No\.?\s*([A-Z0-9]+)/i) || pageText.match(/(FMP[A-Z]\d+)/i); if (awbMatch) awbNo = awbMatch[1];
-                    const nameMatch = pageText.match(/Name:\s*([^,]+)/i); if (nameMatch) customerName = nameMatch[1].trim();
-
-                    let skuStartIndex = textItems.findIndex(item => item.includes("SKU ID | Description"));
-                    if (skuStartIndex !== -1) {
-                        let skuParts = [], foundSerial = false;
-                        for (let j = skuStartIndex + 1; j < textItems.length; j++) {
-                            let item = textItems[j];
-                            if (item.match(/^FMP[A-Z0-9]+/i) || item.includes("STD E") || item.includes("Ordered through") || item.includes("Not for resale") || item.includes("Sold By:")) break;
-                            if (item === "QTY") continue;
-                            if (!foundSerial && item === "1") { foundSerial = true; continue; }
-                            if (/^\d+$/.test(item)) quantity = item; else skuParts.push(item);
-                        }
-                        if (skuParts.length > 0) skuDetails = skuParts.join(" ");
-                    }
-                    if (orderID !== "Not Found" || customerName !== "Not Found") extractedData.push([orderID, awbNo, customerName, skuDetails, quantity === "Not Found" ? "1" : quantity, i]);
-                }
-            }
-            if (extractedData.length === 0) { status.innerText = "No data found."; status.className = 'status error'; return; }
-            const ws_data = [["Order No.", "AWB No.", "Customer Name", "SKU ID | Description", "Qty", "Page No."], ...extractedData];
-            const ws = XLSX.utils.aoa_to_sheet(ws_data); const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "EKart_Orders"); XLSX.writeFile(wb, "EKart_Labels.xlsx");
-            status.innerText = `✅ ${extractedData.length} records generated!`; status.className = 'status success';
-        } catch (error) { status.innerText = "Error parsing E-Kart PDF."; status.className = 'status error';
-        } finally { ekartExtractBtn.disabled = false; ekartExtractBtn.innerText = "Export"; }
-    });
-    document.getElementById('clearEkartBtn').addEventListener('click', () => { document.getElementById('ekartPdfInput').value = ''; document.getElementById('ekartStatus').textContent = ''; });
-
-    /* ==========================================
-       3. MEESHO / FIXED DATA EXTRACTOR (DELIVERY PARTNER INCLUDED)
-       ========================================== */
-    const genericExtractBtn = document.getElementById("genericExtractBtn");
-    genericExtractBtn.addEventListener("click", async () => {
-        const files = document.getElementById("genericPdfInput").files;
-        const status = document.getElementById("genericStatus");
-        if (!files.length) { status.innerText = "Upload PDF first."; status.className = 'status error'; return; }
-
-        genericExtractBtn.disabled = true; genericExtractBtn.innerText = "Processing..."; status.innerText = "";
-        try {
-            let extractedData = [];
-            for(let file of files) {
-                const arrayBuffer = await file.arrayBuffer(); 
-                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-                
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i); 
-                    const textContent = await page.getTextContent();
-                    const textItems = textContent.items.map(item => item.str.trim()); 
-                    const pageText = textItems.join(" ");
-                    
-                    let customerName = "Not Found", productSku = "Not Found", description = "Not Found", quantity = "Not Found", orderNumber = "Not Found", totalAmount = "Not Found", courierPartner = "Not Found";
-
-                    // 1. Courier Partner Extraction
-                    const couriers = ["valmoplus", "valmo", "delhivery", "shadowfax", "ecom express", "xpressbees", "blue dart", "smartr"];
-                    for(let j=0; j < Math.min(textItems.length, 100); j++){
-                        let txt = textItems[j].toLowerCase();
-                        
-                        // Check known list
-                        let matched = couriers.find(c => txt.includes(c));
-                        if(matched) { courierPartner = textItems[j]; break; }
-                        
-                        // Fallback: Check word before "Pickup" or "Surface"
-                        if(txt === "pickup" || txt === "surface") {
-                            if(j > 0 && textItems[j-1].length > 2 && !textItems[j-1].toLowerCase().includes("cash")) {
-                                courierPartner = textItems[j-1]; break;
-                            }
-                        }
-                    }
-
-                    // 2. Name Extraction
-                    for (let j = 0; j < textItems.length; j++) {
-                        if (textItems[j] === "Customer Address" || textItems[j] === "Customer Name") {
-                            let k = j + 1; while (k < textItems.length && textItems[k] === "") k++;
-                            if (k < textItems.length) customerName = textItems[k]; break;
-                        }
-                    }
-                    
-                    // 3. SKU, Qty, Order Number Extraction
-                    const tableRegex = /Order No\.\s+(\S+)\s+(.+?)\s+(\d+)\s+([a-zA-Z]+)\s+(\d{16,}(?:[_\s]\d+)?)/;
-                    const match = pageText.match(tableRegex);
-                    if (match) { productSku = match[1]; quantity = match[3]; orderNumber = match[5].replace(/\s+/g, '_'); } 
-                    else { 
-                        const orderHunt = pageText.match(/(\d{16,}(?:[_\s]\d+)?)/); 
-                        if (orderHunt) orderNumber = orderHunt[1].replace(/\s+/g, '_'); 
-                        
-                        let skuIdx = textItems.indexOf("SKU");
-                        if(skuIdx !== -1) {
-                            let s = skuIdx + 1; while(s < textItems.length && textItems[s] === "") s++;
-                            if(s < textItems.length) productSku = textItems[s];
-                        }
-                        
-                        let qtyIdx = textItems.indexOf("Qty");
-                        if(qtyIdx !== -1) {
-                            for(let q = qtyIdx+1; q < qtyIdx+5; q++){
-                                if(/^\d+$/.test(textItems[q])){ quantity = textItems[q]; break; }
-                            }
-                        }
-                    }
-
-                    // 4. Total Amount
-                    const rsMatches = [...pageText.matchAll(/Rs\.\s*(\d+\.\d{2})/g)];
-                    if (rsMatches.length > 0) totalAmount = rsMatches[rsMatches.length - 1][1];
-
-                    // 5. Description Extraction
-                    let headerTotalIdx = textItems.lastIndexOf("Total"); 
-                    if (headerTotalIdx !== -1) {
-                        let k = headerTotalIdx + 1;
-                        let descParts = [];
-                        while (k < textItems.length) {
-                            let txt = textItems[k].trim();
-                            if (txt === "" || txt === "Tax Invoice" || txt === "Original For Recipient" || txt.includes("BILL TO")) { k++; continue; }
-                            
-                            if (/^\d{4,8}$/.test(txt)) break; // HSN Code hit
-                            if (txt.includes("Other Charges") || txt.includes("Shipping") || /^Rs\./i.test(txt)) break; // End of desc hit
-
-                            descParts.push(txt);
-                            k++;
-                        }
-                        if (descParts.length > 0) description = descParts.join(" ");
-                    }
-
-                    if (customerName !== "Not Found" || orderNumber !== "Not Found") {
-                        extractedData.push([customerName, courierPartner, productSku, description, quantity, orderNumber, totalAmount, i]);
-                    }
-                }
-            }
-            if (extractedData.length === 0) { status.innerText = "No data found."; status.className = 'status error'; return; }
-            
-            // Generate Excel with Delivery Partner Column
-            const ws_data = [["Customer Full Name", "Delivery Partner", "Item SKU", "Item Description", "Qty", "Order Reference No.", "Total Amount (Rs.)", "Page No."], ...extractedData];
-            const ws = XLSX.utils.aoa_to_sheet(ws_data); const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Meesho_Orders"); XLSX.writeFile(wb, "Meesho_Order_Data.xlsx");
-            
-            status.innerText = `✅ ${extractedData.length} records generated!`; status.className = 'status success';
-        } catch (error) { console.error(error); status.innerText = "Something went wrong."; status.className = 'status error';
-        } finally { genericExtractBtn.disabled = false; genericExtractBtn.innerText = "Export"; }
-    });
-    document.getElementById('clearGenericBtn').addEventListener('click', () => { document.getElementById('genericPdfInput').value = ''; document.getElementById('genericStatus').textContent = ''; });
-
-    /* ==========================================
-       4. FLIPKART LABEL CROPPER
+       2. FLIPKART LABEL CROPPER
        ========================================== */
     const cropBtn = document.getElementById('cropBtn');
     cropBtn.addEventListener('click', async () => {
@@ -494,7 +276,7 @@
     document.getElementById('clearCropBtn').addEventListener('click', () => { document.getElementById('cropPdfInput').value = ''; document.getElementById('cropStatus').textContent = ''; });
 
     /* ==========================================
-       5. PDF MERGER
+       3. PDF MERGER
        ========================================== */
     const pdfFilesInput = document.getElementById('pdfFiles');
     const mergeBtn = document.getElementById('mergeBtn');
@@ -525,7 +307,7 @@
     document.getElementById('clearMergeBtn').addEventListener('click', () => { selectedMergeFiles = []; pdfFilesInput.value = ''; document.getElementById('fileList').innerHTML=''; document.getElementById('mergeStatus').textContent=''; });
 
     /* ==========================================
-       6. REARRANGE PAGES
+       4. REARRANGE PAGES
        ========================================== */
     const rearrangeBtn = document.getElementById('rearrangeBtn');
     let rearrangeBytes = null;
@@ -547,7 +329,7 @@
     document.getElementById('clearRearrangeBtn').addEventListener('click', () => { document.getElementById('rearrangePdfInput').value=''; document.getElementById('pageOrder').value=''; rearrangeBytes=null; document.getElementById('rearrangeStatus').textContent=''; });
 
     /* ==========================================
-       7. ODD/EVEN SPLITTER
+       5. ODD/EVEN SPLITTER
        ========================================== */
     let splitBytes = null;
     document.getElementById('splitPdfInput').addEventListener('change', async (e) => { if(e.target.files[0]) splitBytes = await e.target.files[0].arrayBuffer(); });
@@ -569,7 +351,7 @@
     document.getElementById('clearSplitBtn').addEventListener('click', () => { document.getElementById('splitPdfInput').value=''; splitBytes=null; document.getElementById('splitStatus').textContent=''; });
 
     /* ==========================================
-       8. REMOVE PAGES
+       6. REMOVE PAGES
        ========================================== */
     const removeBtn = document.getElementById('removeBtn');
     let removeBytes = null;
@@ -589,6 +371,79 @@
       finally { removeBtn.disabled = false; }
     });
     document.getElementById('clearRemoveBtn').addEventListener('click', () => { document.getElementById('removePdfInput').value=''; document.getElementById('pagesToRemove').value=''; removeBytes=null; document.getElementById('removeStatus').textContent=''; });
+
+    /* ==========================================
+       7. MERGE EXCEL FILES
+       ========================================== */
+    const excelMergeBtn = document.getElementById('excelMergeBtn');
+    
+    excelMergeBtn.addEventListener('click', async () => {
+      const fileInput = document.getElementById('excelMergeInput');
+      const status = document.getElementById('excelMergeStatus');
+      const files = fileInput.files;
+
+      if (files.length < 2) {
+        status.textContent = 'Select at least 2 Excel files.';
+        status.className = 'status error';
+        return;
+      }
+
+      excelMergeBtn.disabled = true;
+      excelMergeBtn.textContent = 'Merging...';
+      status.textContent = '';
+
+      try {
+        let combinedData = [];
+
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const arrayBuffer = await file.arrayBuffer();
+          
+          // Read the workbook
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          
+          // Get the first sheet
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          // Convert sheet data to JSON array
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          
+          // Combine arrays
+          combinedData = combinedData.concat(jsonData);
+        }
+
+        if (combinedData.length === 0) {
+          status.textContent = 'No data found in files.';
+          status.className = 'status error';
+          return;
+        }
+
+        // Create a new sheet with the combined data
+        const newWorksheet = XLSX.utils.json_to_sheet(combinedData);
+        const newWorkbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, "Merged_Data");
+
+        // Export and download the combined Excel file
+        const excelBuffer = XLSX.write(newWorkbook, { bookType: 'xlsx', type: 'array' });
+        triggerDownload(excelBuffer, "Merged_Excel.xlsx", true);
+        
+        status.textContent = `✅ Merged ${files.length} files successfully!`;
+        status.className = 'status success';
+      } catch (error) {
+        console.error(error);
+        status.textContent = 'Error merging files.';
+        status.className = 'status error';
+      } finally {
+        excelMergeBtn.disabled = false;
+        excelMergeBtn.textContent = 'Merge & Download';
+      }
+    });
+
+    document.getElementById('clearExcelMergeBtn').addEventListener('click', () => {
+      document.getElementById('excelMergeInput').value = '';
+      document.getElementById('excelMergeStatus').textContent = '';
+    });
 
   </script>
 </body>
